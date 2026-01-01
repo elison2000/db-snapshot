@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据库快照</title>
+    <script src="/db-snapshot/static/echarts.min.js"></script>
+
+    <style>
+        /* ==========================================================================
+           1. 变量系统：统一管理颜色、间距和风格
+           ========================================================================== */
+        :root {
+            /* 品牌色与状态色 */
+            --color-primary: #409eff;
+            --color-primary-hover: #66b1ff;
+            --color-success: #10b981;
+            --color-success-hover: #059669;
+            --color-danger: #ef4444;
+            --color-danger-hover: #dc2626;
+            --color-warning: #f59e0b;
+            --color-warning-hover: #d97706;
+            --color-info: #6b7280;
+            /* 中性色 */
+            --bg-main: #f3f4f6;
+            --card-bg: #ffffff;
+            --text-main: #1f2937;
+            --text-sub: #6b7280;
+            --border-light: #e5e7eb;
+            --input-bg: #f9fafb;
+
+            /* 布局参数 */
+            --radius: 4px;
+            --shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+            --transition: all 0.2s ease;
+        }
+
+        /* ==========================================================================
+           2. 基础重置
+           ========================================================================== */
+        body {
+            margin: 0;
+            padding: 5px;
+            background-color: var(--bg-main);
+            font-family: 'Inter', -apple-system, system-ui, sans-serif;
+            color: var(--text-main);
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 100%;
+            margin: 0 auto;
+        }
+
+        /* ==========================================================================
+           3. 组件样式 (Header, Toolbar, Card)
+           ========================================================================== */
+
+        /* 头部导航 */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--card-bg);
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border-light);
+            margin-bottom: 5px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            font-size: 13px;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .divider {
+            color: #d1d5db;
+        }
+
+        .header-right {
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* 工具栏 */
+        .toolbar {
+            background: var(--card-bg);
+            padding: 12px 20px;
+            border-radius: 8px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            box-shadow: var(--shadow);
+            margin-bottom: 5px;
+            flex-wrap: wrap;
+        }
+
+        .input-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .input-group label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-sub);
+            white-space: nowrap;
+        }
+
+        .input-group input {
+            padding: 6px 10px;
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius);
+            background: var(--input-bg);
+            outline: none;
+            font-size: 13px;
+            transition: var(--transition);
+        }
+
+        .input-group input:focus {
+            border-color: var(--color-primary);
+        }
+
+        /* 特定输入框样式 */
+        #instId { width: 70px; }
+        #instId[readonly] { background-color: var(--bg-main); cursor: not-allowed; }
+
+        /* 图表容器 */
+        .chart-container {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+            height: 680px;
+            position: relative;
+        }
+
+        .chart-hint {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 11px;
+            color: #9ca3af;
+            background: var(--input-bg);
+            padding: 3px 8px;
+            border-radius: 4px;
+            z-index: 10;
+        }
+
+        #main-chart { width: 100%; height: 100%; }
+
+        /* 反馈组件 */
+        .alert-box {
+            display: none;
+            margin-top: 5px;
+            background: #fef2f2;
+            border: 1px solid #fee2e2;
+            border-radius: 6px;
+            padding: 12px;
+            color: #991b1b;
+            font-size: 13px;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .error-msg {
+            color: var(--color-danger);
+            font-size: 12px;
+            margin-left: 10px;
+            display: none;
+        }
+
+        /* ==========================================================================
+           4. 按钮系统 (原子化设计)
+           ========================================================================== */
+        .btn-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 14px;
+            border-radius: var(--radius);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: var(--transition);
+            border: 1px solid transparent;
+            white-space: nowrap;
+        }
+
+        .btn:disabled {
+            background: #f3f4f6 !important;
+            color: #9ca3af !important;
+            border-color: var(--border-light) !important;
+            cursor: not-allowed;
+        }
+
+        /* 按钮变体 */
+        .btn-primary {
+            background: var(--color-primary);
+            color: white;
+            padding: 7px 18px; /* 搜索按钮略大 */
+            font-weight: 600;
+        }
+        .btn-primary:hover { background: var(--color-primary-hover); }
+
+        .btn-success {
+            background: var(--color-success);
+            color: white;
+        }
+        .btn-success:hover { background: var(--color-success-hover); }
+
+        .btn-danger {
+            background: var(--color-danger);
+            color: white;
+        }
+        .btn-danger:hover { background: var(--color-danger-hover); }
+
+        .btn-default {
+            background: #ffffff;
+            color: var(--text-main);
+            border: 1px solid var(--border-light);
+            font-size: 12px;
+        }
+        .btn-default:hover {
+            border-color: var(--color-primary);
+            color: var(--color-primary);
+            background: #f9fafb;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header class="header">
+        <div class="header-left">
+            <div class="info-item">
+                <span>📦</span>
+                <span>实例: <span id="display-inst-id">--</span></span>
+            </div>
+            <span class="divider">|</span>
+            <div id="host-info" class="info-item">
+                <span>🔗</span>
+                <span>地址: <span id="display-host">--:--</span></span>
+            </div>
+        </div>
+        <div class="header-right">
+            <span>🔄</span>
+            <span id="update-time">--:--:--</span>
+        </div>
+    </header>
+
+    <div class="toolbar">
+        <div class="input-group">
+            <label>实例ID</label>
+            <input type="number" id="instId" placeholder="输入ID">
+        </div>
+        <div class="input-group">
+            <label>开始时间</label>
+            <input type="datetime-local" id="startTime">
+        </div>
+        <div class="input-group">
+            <label>结束时间</label>
+            <input type="datetime-local" id="endTime">
+        </div>
+
+        <div class="btn-group">
+            <button class="btn btn-primary" id="btn-search" onclick="fetchData()">查询</button>
+            <button class="btn btn-default" onclick="searchData(1)">1h</button>
+            <button class="btn btn-default" onclick="searchData(6)">6h</button>
+            <button class="btn btn-default" onclick="searchData(12)">12h</button>
+            <button class="btn btn-default" onclick="searchData(24)">1d</button>
+            <button class="btn btn-default" onclick="searchData(48)">2d</button>
+        </div>
+
+        <span id="network-error" class="error-msg"></span>
+    </div>
+
+    <div class="chart-container">
+        <div class="chart-hint">💡点击任意图表区域可查看快照内容</div>
+        <div id="main-chart"></div>
+    </div>
+
+    <div id="alert-box" class="alert-box"></div>
+</div>
+
+<script>
+    /* JavaScript 逻辑保持不变以确保功能一致 */
+    const API_BASE_URL = '/db-snapshot/api/snapshotList';
+    const chartDom = document.getElementById('main-chart');
+    const myChart = echarts.init(chartDom);
+    const errorMsg = document.getElementById('network-error');
+    const alertBox = document.getElementById('alert-box');
+    const searchBtn = document.getElementById('btn-search');
+
+    const formatLocal = (d) => {
+        const pad = (n) => n < 10 ? '0' + n : n;
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+
+    /* 修复点：强制截取前16位，防止浏览器自带秒数导致格式错误 (如 00:00:00:00) */
+    const formatForBackend = (isoStr) => isoStr ? isoStr.substring(0, 16).replace('T', ' ') + ':00' : '';
+
+    function initInputs() {
+        const now = new Date();
+        const endTime = new Date(now.getTime() + 60 * 1000);
+        const startTime = new Date(endTime.getTime() - 24 * 60 * 60 * 1000);
+        document.getElementById('endTime').value = formatLocal(endTime);
+        document.getElementById('startTime').value = formatLocal(startTime);
+    }
+
+    function handleRouting() {
+        const path = window.location.pathname;
+        const instInput = document.getElementById('instId');
+        const match = path.match(/^\/db-snapshot\/dashboard\/(\d+)/);
+        if (match) {
+            instInput.value = match[1];
+            instInput.setAttribute('readonly', 'true');
+        } else {
+            instInput.value = "0";
+            instInput.removeAttribute('readonly');
+        }
+    }
+
+    async function fetchConfig(instId) {
+        const hostInfo = document.getElementById('host-info');
+        const displayHost = document.getElementById('display-host');
+        if (!hostInfo || !displayHost) return;
+        /* 保留原逻辑：ID为0时不加载配置 */
+        if (!instId || instId === "0") {
+            hostInfo.style.display = 'none';
+            return;
+        }
+        try {
+            const res = await fetch(`/db-snapshot/api/config/${instId}`);
+            if (!res.ok) throw new Error();
+            const json = await res.json();
+            const cfg = json.data || json;
+            if (cfg.Host && cfg.Port) {
+                displayHost.innerText = `${cfg.Host}:${cfg.Port}`;
+                hostInfo.style.display = 'flex';
+            } else { hostInfo.style.display = 'none'; }
+        } catch (err) { hostInfo.style.display = 'none'; }
+    }
+
+    async function fetchData() {
+        myChart.showLoading({text: '加载中...', color: '#3b82f6', textColor: '#3b82f6'});
+        errorMsg.style.display = 'none';
+        alertBox.style.display = 'none';
+        searchBtn.disabled = true;
+
+        const instId = document.getElementById('instId').value;
+        const startRaw = document.getElementById('startTime').value;
+        const endRaw = document.getElementById('endTime').value;
+
+        fetchConfig(instId);
+
+        try {
+            const params = new URLSearchParams({
+                inst_id: instId,
+                start_time: formatForBackend(startRaw),
+                end_time: formatForBackend(endRaw)
+            });
+            const response = await fetch(`${API_BASE_URL}?${params.toString()}`);
+            if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+            const res = await response.json();
+            const data = Array.isArray(res) ? res : (res.data || res.list);
+            if (!data || data.length === 0) throw new Error("当前时间段无数据");
+            document.getElementById('display-inst-id').innerText = instId;
+            document.getElementById('update-time').innerText = new Date().toLocaleTimeString();
+            renderChart(data);
+        } catch (err) {
+            myChart.hideLoading();
+            myChart.clear();
+            errorMsg.innerText = `请求失败: ${err.message}`;
+            errorMsg.style.display = 'inline';
+        } finally {
+            searchBtn.disabled = false;
+        }
+    }
+
+    function searchData(hour) {
+        const now = new Date();
+        const endTime = new Date(now.getTime() + 60 * 1000);
+        const startTime = new Date(endTime.getTime() - hour * 60 * 60 * 1000);
+        document.getElementById('endTime').value = formatLocal(endTime);
+        document.getElementById('startTime').value = formatLocal(startTime);
+        fetchData();
+    }
+
+    function renderChart(data) {
+        myChart.hideLoading();
+        const rules = [
+            {key: 'SessCount', threshold: 10000, msg: '总连接数 > 10000'},
+            {key: 'ActSessCount', threshold: 64, msg: '活动会话数 > 64'},
+            {key: 'TxnCount', threshold: 64, msg: '事务数 > 64'},
+            {key: 'MaxQuerySeconds', threshold: 3600, msg: '最长查询耗时 > 3600s'},
+            {key: 'MaxTxnSeconds', threshold: 300, msg: '最长事务耗时 > 300s'},
+            {key: 'BigQueryCount', threshold: 16, msg: '大查询数 > 16'},
+            {key: 'WaitSessCount', threshold: 16, msg: '等待会话数 > 16'},
+            {key: 'LockCount', threshold: 16, msg: '锁数 > 16'}
+        ];
+        const violations = new Set();
+        data.forEach(item => {
+            rules.forEach(rule => {
+                if ((item[rule.key] || 0) > rule.threshold) violations.add(rule.msg);
+            });
+        });
+        if (violations.size > 0) {
+            alertBox.innerHTML = `<strong>⚠️ 异常检测</strong><br>当前时间范围内存在异常：` + Array.from(violations).join('； ');
+            alertBox.style.display = 'block';
+        } else { alertBox.style.display = 'none'; }
+
+        const times = data.map(d => d.CreateTime);
+        const mapData = (key) => data.map(d => d[key]);
+
+        const option = {
+            color: ['#3b82f6', '#10b981', '#3BA272', '#f59e0b', '#FAC858', '#ef4444'],
+            legend: { show: true, top: 0, left: 'center', itemGap: 20, icon: 'circle', textStyle: {color: '#4b5563', fontWeight: 500} },
+            tooltip: {
+                trigger: 'axis',
+                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                borderColor: '#e5e7eb', borderWidth: 1, padding: [10, 14],
+                textStyle: {color: '#1f2937', fontSize: 12},
+                axisPointer: {type: 'cross', label: {backgroundColor: '#6b7280'}},
+                formatter: function (params) {
+                    if (!params.length) return '';
+                    let time = params[0].axisValueLabel;
+                    let html = `<div style="font-weight:bold; margin-bottom:8px; border-bottom:1px solid #eee; padding-bottom:4px;">${time}</div>`;
+                    const orderMap = ['活动会话数', '事务数', '总连接数', '最长查询耗时', '大查询数', '最长事务耗时', '等待会话数', '锁数'];
+                    params.filter(i => i.value !== undefined)
+                        .sort((a, b) => orderMap.indexOf(a.seriesName) - orderMap.indexOf(b.seriesName))
+                        .forEach(item => {
+                            html += `<div style="display:flex; justify-content:space-between; margin-bottom:4px; min-width:160px;">
+                                <span style="display:flex; align-items:center;">${item.marker} <span style="color:#666; margin-left:4px;">${item.seriesName}</span></span>
+                                <span style="font-weight:bold; color:#333;">${item.value}</span>
+                              </div>`;
+                        });
+                    return html;
+                }
+            },
+            axisPointer: {link: {xAxisIndex: 'all'}},
+            grid: [
+                {left: 60, right: 60, height: '22%', top: '10%'},
+                {left: 60, right: 60, height: '22%', top: '38%'},
+                {left: 60, right: 60, height: '22%', top: '68%'}
+            ],
+            xAxis: [
+                { gridIndex: 0, type: 'category', data: times, show: false, axisPointer: {show: true} },
+                { gridIndex: 1, type: 'category', data: times, show: false, axisPointer: {show: true} },
+                {
+                    gridIndex: 2, type: 'category', data: times,
+                    axisLine: {lineStyle: {color: '#d1d5db'}},
+                    axisLabel: {
+                        color: '#6b7280', hideOverlap: true, interval: 'auto',
+                        /* 修复点：修改 X 轴展示，仅显示 MM-DD 和 HH:mm，不显示秒 */
+                        formatter: v => (v && v.length >= 16) ? v.substring(5, 10) + '\n' + v.substring(11, 16) : v,
+                        fontSize: 11, lineHeight: 14
+                    }
+                }
+            ],
+            yAxis: [
+                { gridIndex: 0, name: '活动会话数/事务数', position: 'left', nameTextStyle: {color: '#3B82F6', fontWeight: 'bold'}, splitLine: {lineStyle: {type: 'dashed', color: '#e5e7eb'}} },
+                { gridIndex: 0, name: '总连接数', position: 'right', nameTextStyle: {color: '#3B82F6', fontWeight: 'bold'}, splitLine: {show: false} },
+                { gridIndex: 1, name: '最长查询耗时(s)', position: 'left', nameTextStyle: {color: '#3B82F6', fontWeight: 'bold'}, splitLine: {lineStyle: {type: 'dashed', color: '#e5e7eb'}} },
+                { gridIndex: 1, name: '大查询数', position: 'right', nameTextStyle: {color: '#3B82F6', fontWeight: 'bold'}, splitLine: {show: false} },
+                { gridIndex: 2, name: '最长事务耗时(s)', position: 'left', nameTextStyle: {color: '#3B82F6', fontWeight: 'bold'}, splitLine: {lineStyle: {type: 'dashed', color: '#e5e7eb'}} },
+                { gridIndex: 2, name: '等待会话数/锁数', position: 'right', nameTextStyle: {color: '#3B82F6', fontWeight: 'bold'}, splitLine: {show: false} },
+            ],
+            dataZoom: [{ type: 'slider', xAxisIndex: [0, 1, 2], bottom: 10, height: 24, fillerColor: 'rgba(59, 130, 246, 0.2)' }, {type: 'inside', xAxisIndex: [0, 1, 2]}],
+            series: [
+                { name: '活动会话数', type: 'line', xAxisIndex: 0, yAxisIndex: 0, data: mapData('ActSessCount'), showSymbol: false, smooth: true, areaStyle: {opacity: 0.1}, itemStyle: {color: '#10b981'}, lineStyle: {width: 1.5} },
+                { name: '事务数', type: 'line', xAxisIndex: 0, yAxisIndex: 0, data: mapData('TxnCount'), showSymbol: false, smooth: true, areaStyle: {opacity: 0.3}, itemStyle: {color: '#f59e0b'}, lineStyle: {width: 1.5} },
+                { name: '总连接数', type: 'line', xAxisIndex: 0, yAxisIndex: 1, data: mapData('SessCount'), showSymbol: false, smooth: true, lineStyle: {width: 1.5}, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{offset: 0, color: 'rgba(59,130,246,0.3)'}, {offset: 1, color: 'rgba(59,130,246,0.01)'}]) } },
+                { name: '最长查询耗时', type: 'line', xAxisIndex: 1, yAxisIndex: 2, data: mapData('MaxQuerySeconds'), showSymbol: false, itemStyle: {color: '#10b981'}, lineStyle: {width: 1.5} },
+                { name: '大查询数', type: 'bar', xAxisIndex: 1, yAxisIndex: 3, data: mapData('BigQueryCount'), itemStyle: {color: '#f59e0b'} },
+                { name: '最长事务耗时', type: 'line', xAxisIndex: 2, yAxisIndex: 4, data: mapData('MaxTxnSeconds'), showSymbol: false, itemStyle: {color: '#10b981'}, lineStyle: {width: 1.5} },
+                { name: '等待会话数', type: 'bar', xAxisIndex: 2, yAxisIndex: 5, data: mapData('WaitSessCount'), itemStyle: {color: '#f59e0b'} },
+                { name: '锁数', type: 'line', xAxisIndex: 2, yAxisIndex: 5, data: mapData('LockCount'), showSymbol: false, smooth: true, itemStyle: {color: '#EF4444'}, lineStyle: {width: 1.5} },
+            ]
+        };
+        myChart.setOption(option, true);
+
+        myChart.getZr().off('click');
+        myChart.getZr().on('click', function (params) {
+            if (!data || data.length === 0) return;
+            const pointInPixel = [params.offsetX, params.offsetY];
+            let xIndex = -1;
+            const gridToSeriesMap = { 0: 0, 1: 3, 2: 5 };
+            for (let i = 0; i < 3; i++) {
+                if (myChart.containPixel({gridIndex: i}, pointInPixel)) {
+                    const result = myChart.convertFromPixel({seriesIndex: gridToSeriesMap[i]}, pointInPixel);
+                    if (result && result.length > 0) { xIndex = result[0]; break; }
+                }
+            }
+            if (xIndex === -1 || xIndex < 0 || xIndex >= data.length) return;
+            const instId = document.getElementById('instId').value;
+            const rawTime = data[xIndex].CreateTime;
+            const fileTime = rawTime.replace(/[-:]/g, '').replace(/[ T]/, '_').substring(0, 15);
+            window.open(`/db-snapshot/data/${fileTime.slice(0, 6)}/${instId}/${fileTime}.html`, '_blank');
+        });
+    }
+
+    window.addEventListener('resize', () => { myChart.resize(); });
+    document.addEventListener('DOMContentLoaded', () => {
+        initInputs();
+        handleRouting();
+        /* 保留原逻辑：ID为0时不加载数据 */
+        if(document.getElementById('instId').value !== "0") fetchData();
+        else myChart.hideLoading();
+    });
+</script>
+</body>
+</html>

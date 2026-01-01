@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实例配置管理</title>
+    <style>
+        :root {
+            --color-primary: #409eff;
+            --color-primary-hover: #66b1ff;
+            --color-success: #67c23a;
+            --color-success-hover: #85ce61;
+            --color-info: #909399;
+            --color-info-hover: #a6a9ad;
+            --color-warning: #e6a23c;
+            --color-warning-hover: #ebb563;
+            --color-danger: #f56c6c;
+            --color-danger-hover: #f78989;
+            --bg-color: #f5f7fa;
+            --card-bg: #ffffff;
+            --border-color: #ebeef5;
+            --text-main: #303133;
+            --text-regular: #606266;
+            --text-secondary: #909399;
+        }
+
+        body { margin: 0; padding: 20px; background-color: var(--bg-color); font-family: 'Inter', "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial, sans-serif; color: var(--text-main); -webkit-font-smoothing: antialiased; }
+        .app-container { max-width: 1280px; margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        h1 { margin: 0; font-size: 18px; font-weight: 600; color: var(--text-main); }
+        .header-actions { display: flex; gap: 10px; }
+
+        .main-card { background: var(--card-bg); border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); overflow: hidden; }
+        .filter-section { padding: 20px 20px 0 20px; background: #fff; }
+        .filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, auto)); gap: 15px; align-items: end; margin-bottom: 20px; }
+        @media (min-width: 1024px) { .filter-grid { grid-template-columns: 160px 160px 200px 140px 1fr; } }
+
+        .filter-label { display: block; font-size: 13px; font-weight: 500; color: var(--text-regular); margin-bottom: 6px; }
+        .filter-input { height: 32px; padding: 0 10px; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 13px; color: var(--text-regular); outline: none; width: 100%; box-sizing: border-box; transition: border-color .2s; }
+        .filter-input:focus { border-color: var(--color-primary); }
+
+        .table-wrapper { width: 100%; overflow-x: auto; border-top: 1px solid var(--border-color); }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; table-layout: fixed; }
+        thead th { position: sticky; top: 0; background-color: #f5f7fa; color: var(--text-secondary); font-weight: 600; text-align: left; padding: 12px 15px; border-bottom: 1px solid var(--border-color); z-index: 10; }
+        tbody td { padding: 12px 15px; border-bottom: 1px solid var(--border-color); color: var(--text-regular); vertical-align: middle; }
+        tbody tr:hover td { background-color: #f5f7fa; }
+
+        .pagination-container { padding: 15px 20px; display: flex; justify-content: flex-end; align-items: center; background: #fff; border-top: 1px solid var(--border-color); gap: 10px; }
+        .page-info { font-size: 13px; color: var(--text-secondary); margin-right: 10px; }
+        .btn-page { padding: 5px 10px; min-width: 32px; height: 32px; border: 1px solid #dcdfe6; background: #fff; cursor: pointer; border-radius: 4px; color: var(--text-regular); font-size: 13px; }
+        .btn-page:disabled { background-color: #f5f7fa; color: #c0c4cc; cursor: not-allowed; }
+        .btn-page.active { background-color: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+
+        .btn { display: inline-flex; justify-content: center; align-items: center; line-height: 1; cursor: pointer; border: 1px solid transparent; outline: none; transition: .1s; font-weight: 500; padding: 9px 15px; font-size: 12px; border-radius: 4px; color: #fff; text-decoration: none; white-space: nowrap; }
+        .btn-primary { background-color: var(--color-primary); border-color: var(--color-primary); }
+        .btn-success { background-color: var(--color-success); border-color: var(--color-success); }
+        .btn-warning { background-color: var(--color-warning); border-color: var(--color-warning); }
+        .btn-danger { background-color: var(--color-danger); border-color: var(--color-danger); }
+        .btn-default { background: #fff; border: 1px solid #dcdfe6; color: var(--text-regular); }
+
+        .btn-primary:hover { background-color: var(--color-primary-hover); border-color: var(--color-primary-hover); box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3); }
+        .btn-success:hover { background-color: var(--color-success-hover); border-color: var(--color-success-hover); box-shadow: 0 2px 8px rgba(103, 194, 58, 0.3); }
+        .btn-danger:hover  { background-color: var(--color-danger-hover); border-color: var(--color-danger-hover); box-shadow: 0 2px 8px rgba(245, 108, 108, 0.3); }
+        .btn-warning:hover { background-color: var(--color-warning-hover); border-color: var(--color-warning-hover); box-shadow: 0 2px 8px rgba(230, 162, 60, 0.3); }
+
+        .action-group { display: flex; gap: 8px; flex-wrap: wrap; }
+        .tag { display: inline-block; padding: 4px 10px; font-size: 12px; border-radius: 4px; color: #fff; line-height: 1.2; font-weight: 500; white-space: nowrap; border: none; }
+        .tag-primary { background-color: var(--color-primary); }
+        .tag-success { background-color: var(--color-success); }
+        .tag-warning { background-color: var(--color-warning); }
+        .tag-danger  { background-color: var(--color-danger); }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: none; justify-content: center; align-items: center; }
+        .modal-show { display: flex; animation: fadeIn 0.3s; }
+        .modal-box { background: #fff; width: 460px; border-radius: 4px; box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1); overflow: hidden; }
+        .modal-header { padding: 15px 20px; border-bottom: 1px solid #ebeef5; font-size: 16px; font-weight: 600; color: var(--text-main); }
+        .modal-body { padding: 20px; }
+        .modal-footer { padding: 10px 20px 20px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f0f0f0; margin-top: 10px; padding-top: 15px; }
+
+        .form-row-2 { display: grid; grid-template-columns: 2fr 1fr; gap: 15px; }
+        .form-item { margin-bottom: 18px; }
+        .form-label { display: block; font-size: 13px; color: var(--text-regular); margin-bottom: 8px; font-weight: 500;}
+        .form-input, .form-select { background-color: #fff; border-radius: 4px; border: 1px solid #dcdfe6; box-sizing: border-box; color: var(--text-regular); height: 36px; line-height: 36px; outline: none; padding: 0 15px; width: 100%; transition: border-color .2s; font-size: 13px; }
+        .form-input[readonly] { background-color: #f5f7fa; color: #c0c4cc; cursor: not-allowed; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+        #toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); padding: 10px 20px; border-radius: 4px; font-size: 13px; font-weight: 500; box-shadow: 0 2px 12px 0 rgba(0,0,0,0.1); display: none; z-index: 2000; }
+        .toast-success { background-color: #f0f9eb; color: var(--color-success); border: 1px solid #e1f3d8; }
+        .toast-error { background-color: #fef0f0; color: var(--color-danger); border: 1px solid #fde2e2; }
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <div class="header">
+        <h1>实例配置列表</h1>
+        <div class="header-actions">
+            <button class="btn btn-primary" onclick="reloadConfig()" id="btn-reload">
+                <span style="font-size:14px; margin-right:4px;">↻</span> 重载配置
+            </button>
+            <button class="btn btn-primary" onclick="openModal('create')">
+                <span style="font-size:14px; margin-right:4px;">+</span> 新增配置
+            </button>
+        </div>
+    </div>
+
+    <div class="main-card">
+        <div class="filter-section">
+            <div class="filter-grid">
+                <div>
+                    <span class="filter-label">实例 ID</span>
+                    <input type="text" id="filter-id" class="filter-input" placeholder="输入ID搜索" oninput="handleFilterChange()">
+                </div>
+                <div>
+                    <span class="filter-label">数据库类型</span>
+                    <select id="filter-type" class="filter-input" onchange="handleFilterChange()">
+                        <option value="">全部</option>
+                        <option value="mysql">MySQL</option>
+                        <option value="polar">PolarDB</option>
+                        <option value="tdsqlc">TDSQL-C</option>
+                        <option value="oracle">Oracle</option>
+                        <option value="oceanbase">OceanBase</option>
+                        <option value="pgsql">PostgreSQL</option>
+                    </select>
+                </div>
+                <div>
+                    <span class="filter-label">IP 地址</span>
+                    <input type="text" id="filter-host" class="filter-input" placeholder="输入IP搜索" oninput="handleFilterChange()">
+                </div>
+                <div style="width: 120px;">
+                    <span class="filter-label">&nbsp;</span>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-default" onclick="resetFilter()" style="height: 32px; padding: 0 15px;">重置</button>
+                        <button class="btn btn-default" onclick="fetchList(true)" title="刷新数据" style="height: 32px; padding: 0 10px;">
+                            <span style="font-size: 14px;">↻</span>
+                        </button>
+                    </div>
+                </div>
+                <div></div>
+            </div>
+        </div>
+
+        <div class="table-wrapper">
+            <table id="data-table">
+                <thead>
+                <tr>
+                    <th width="100">实例 ID</th>
+                    <th width="120">数据库类型</th>
+                    <th width="320">数据库地址</th>
+                    <th width="100">端口</th>
+                    <th>数据库/服务名</th>
+                    <th width="260">操作</th>
+                </tr>
+                </thead>
+                <tbody id="table-body">
+                </tbody>
+            </table>
+        </div>
+
+        <div class="pagination-container" id="pagination">
+            <span class="page-info" id="page-info">共 0 条</span>
+            <button class="btn-page" id="btn-prev" onclick="changePage(-1)">上一页</button>
+            <div id="page-numbers" style="display: flex; gap: 5px;"></div>
+            <button class="btn-page" id="btn-next" onclick="changePage(1)">下一页</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modal">
+    <div class="modal-box">
+        <div class="modal-header" id="modal-title">新增/编辑</div>
+        <div class="modal-body">
+            <form id="config-form" onsubmit="event.preventDefault(); saveConfig();">
+                <div class="form-row-2">
+                    <div class="form-item">
+                        <label class="form-label">实例 ID <span style="color:var(--color-danger)">*</span></label>
+                        <input type="number" id="inp-instId" class="form-input" placeholder="请输入唯一数字ID">
+                    </div>
+                    <div class="form-item">
+                        <label class="form-label">数据库类型</label>
+                        <select id="inp-dbType" class="form-select">
+                            <option value="mysql">MySQL</option>
+                            <option value="polar">PolarDB</option>
+                            <option value="tdsqlc">TDSQL-C</option>
+                            <option value="oracle">Oracle</option>
+                            <option value="oceanbase">OceanBase</option>
+                            <option value="pgsql">PostgreSQL</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row-2">
+                    <div class="form-item">
+                        <label class="form-label">地址 (Host)</label>
+                        <input type="text" id="inp-host" class="form-input" placeholder="例如: 10.0.0.1">
+                    </div>
+                    <div class="form-item">
+                        <label class="form-label">端口 (Port)</label>
+                        <input type="number" id="inp-port" class="form-input" placeholder="例如: 3306">
+                    </div>
+                </div>
+                <div class="form-item" style="margin-bottom: 0;">
+                    <label class="form-label">数据库/服务名 (DB Name)</label>
+                    <input type="text" id="inp-dbName" class="form-input" placeholder="Schema Name / Service Name">
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <div style="flex: 1;">
+                <button type="button" class="btn btn-warning" id="btn-test" onclick="testConnection()">
+                    ⚡️ 测试连通性
+                </button>
+            </div>
+            <div>
+                <button class="btn btn-default" onclick="closeModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveConfig()" id="btn-save">确定</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="confirm-modal">
+    <div class="modal-box" style="width: 380px;">
+        <div class="modal-header" id="confirm-title" style="color: var(--color-danger);">确认操作</div>
+        <div class="modal-body" id="confirm-msg" style="padding: 25px 20px; font-size: 14px; line-height: 1.5; color: var(--text-regular);">
+            确定要执行此操作吗？
+        </div>
+        <div class="modal-footer" style="justify-content: flex-end; gap: 12px; background: #fafafa;">
+            <button class="btn btn-default" onclick="handleConfirmResponse(false)">取消</button>
+            <button class="btn btn-danger" id="confirm-ok-btn" onclick="handleConfirmResponse(true)">确定</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="toast-success">操作成功</div>
+
+<script>
+    const API_BASE = '/db-snapshot/api/config';
+    let currentMode = 'create';
+    let globalList = [];
+    let filteredList = [];
+    let currentPage = 1;
+    const pageSize = 10;
+
+    // 用于自定义确认框的 Promise 控制
+    let confirmResolver = null;
+
+    fetchList();
+
+    async function fetchList(manual = false) {
+        const tbody = document.getElementById('table-body');
+        const table = document.getElementById('data-table');
+        table.style.opacity = '0.5';
+
+        try {
+            const res = await fetch(API_BASE + '/');
+            if (!res.ok) throw new Error('Failed to fetch');
+            const json = await res.json();
+            globalList = Array.isArray(json) ? json : (json.data || []);
+            applyFilter();
+            if (manual) showToast('数据已刷新');
+        } catch (err) {
+            console.error(err);
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--color-danger);">加载失败</td></tr>';
+        } finally {
+            table.style.opacity = '1';
+        }
+    }
+
+    function handleFilterChange() {
+        currentPage = 1;
+        applyFilter();
+    }
+
+    function applyFilter() {
+        const idVal = document.getElementById('filter-id').value.trim();
+        const typeVal = document.getElementById('filter-type').value.toLowerCase();
+        const hostVal = document.getElementById('filter-host').value.trim();
+
+        filteredList = globalList.filter(item => {
+            if (idVal && !item.InstID.toString().includes(idVal)) return false;
+            if (typeVal && (item.DBType || '').toLowerCase() !== typeVal) return false;
+            if (hostVal && !(item.Host || '').includes(hostVal)) return false;
+            return true;
+        });
+        renderTable();
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('table-body');
+        const total = filteredList.length;
+        const totalPages = Math.ceil(total / pageSize) || 1;
+        if (currentPage > totalPages) currentPage = totalPages;
+
+        const start = (currentPage - 1) * pageSize;
+        const end = start + pageSize;
+        const pageData = filteredList.slice(start, end);
+
+        if (pageData.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#909399;">暂无数据</td></tr>';
+            updatePagination(0, 1);
+            return;
+        }
+
+        tbody.innerHTML = pageData.map(item => {
+            const safeItem = JSON.stringify(item).replace(/"/g, '&quot;');
+            const dbType = (item.DBType || '').toLowerCase();
+            let tagClass = 'tag-warning';
+            if (dbType.includes('mysql') || dbType.includes('polar') || dbType.includes('tdsqlc')) tagClass = 'tag-primary';
+            else if (dbType.includes('oracle')) tagClass = 'tag-danger';
+            else if (dbType.includes('pg') || dbType.includes('postgre')) tagClass = 'tag-success';
+
+            return `
+                <tr>
+                    <td style="font-weight:bold;">${item.InstID}</td>
+                    <td><span class="tag ${tagClass}">${item.DBType || 'Unknown'}</span></td>
+                    <td>${item.Host}</td>
+                    <td>${item.Port}</td>
+                    <td>${item.DBName}</td>
+                    <td>
+                        <div class="action-group">
+                            <a href="/db-snapshot/dashboard/${item.InstID}" target="_blank" class="btn btn-success">查看</a>
+                            <button class="btn btn-primary" onclick='openModal("edit", ${safeItem})'>编辑</button>
+                            <button class="btn btn-primary" onclick='cloneItem(${safeItem})'>克隆</button>
+                            <button class="btn btn-danger" onclick="deleteItem(${item.InstID})">删除</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+        updatePagination(total, totalPages);
+    }
+
+    function updatePagination(total, totalPages) {
+        document.getElementById('page-info').innerText = `共 ${total} 条`;
+        document.getElementById('btn-prev').disabled = currentPage === 1;
+        document.getElementById('btn-next').disabled = currentPage === totalPages || totalPages === 0;
+        const pageNumbers = document.getElementById('page-numbers');
+        pageNumbers.innerHTML = '';
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+                const btn = document.createElement('button');
+                btn.className = `btn-page ${i === currentPage ? 'active' : ''}`;
+                btn.innerText = i;
+                btn.onclick = () => { currentPage = i; renderTable(); };
+                pageNumbers.appendChild(btn);
+            } else if (i === currentPage - 3 || i === currentPage + 3) {
+                const span = document.createElement('span');
+                span.innerText = '...';
+                pageNumbers.appendChild(span);
+            }
+        }
+    }
+
+    function changePage(step) {
+        currentPage += step;
+        renderTable();
+    }
+
+    function resetFilter() {
+        document.getElementById('filter-id').value = '';
+        document.getElementById('filter-type').value = '';
+        document.getElementById('filter-host').value = '';
+        handleFilterChange();
+    }
+
+    function openModal(mode, data = null) {
+        currentMode = mode;
+        const modal = document.getElementById('modal');
+        const instInput = document.getElementById('inp-instId');
+        modal.classList.add('modal-show');
+        if (mode === 'create') {
+            document.getElementById('modal-title').innerText = '新增配置';
+            document.getElementById('config-form').reset();
+            instInput.removeAttribute('readonly');
+        } else if (mode === 'edit') {
+            document.getElementById('modal-title').innerText = '编辑配置';
+            fillForm(data);
+            instInput.setAttribute('readonly', 'true');
+        } else if (mode === 'clone') {
+            document.getElementById('modal-title').innerText = '克隆配置 (请输入新ID)';
+            fillForm(data);
+            instInput.value = '';
+            instInput.removeAttribute('readonly');
+            currentMode = 'create';
+        }
+    }
+
+    function fillForm(data) {
+        document.getElementById('inp-instId').value = data.InstID;
+        document.getElementById('inp-dbType').value = (data.DBType || 'mysql').toLowerCase();
+        document.getElementById('inp-host').value = data.Host;
+        document.getElementById('inp-port').value = data.Port;
+        document.getElementById('inp-dbName').value = data.DBName;
+    }
+
+    function cloneItem(data) { openModal('clone', data); }
+    function closeModal() { document.getElementById('modal').classList.remove('modal-show'); }
+
+    // --- 新增：封装好的美化版确认框函数 ---
+    function niceConfirm(msg, title = '确认操作', okText = '确定') {
+        const cModal = document.getElementById('confirm-modal');
+        document.getElementById('confirm-msg').innerText = msg;
+        document.getElementById('confirm-title').innerText = title;
+        document.getElementById('confirm-ok-btn').innerText = okText;
+        cModal.classList.add('modal-show');
+
+        return new Promise((resolve) => {
+            confirmResolver = resolve;
+        });
+    }
+
+    function handleConfirmResponse(result) {
+        document.getElementById('confirm-modal').classList.remove('modal-show');
+        if (confirmResolver) confirmResolver(result);
+    }
+
+    // 修改后的重载函数
+    async function reloadConfig() {
+        const ok = await niceConfirm('确定要重载服务端配置吗？', '系统重载', '重载');
+        if (!ok) return;
+
+        const btn = document.getElementById('btn-reload');
+        btn.disabled = true;
+        try {
+            const res = await fetch(API_BASE + '/reload');
+            if (!res.ok) throw new Error(await res.text());
+            showToast('配置重载成功');
+        } catch (e) { showToast('重载出错: ' + e.message, 'error'); }
+        finally { btn.disabled = false; }
+    }
+
+    async function testConnection() {
+        const btn = document.getElementById('btn-test');
+        const originalText = btn.innerText;
+        const payload = {
+            DBType: document.getElementById('inp-dbType').value,
+            Host: document.getElementById('inp-host').value,
+            Port: parseInt(document.getElementById('inp-port').value),
+            DBName: document.getElementById('inp-dbName').value
+        };
+        if (!payload.Host || !payload.Port) { showToast('Host 和 端口 不能为空', 'error'); return; }
+        btn.innerText = '连接中...'; btn.disabled = true;
+        try {
+            const res = await fetch(API_BASE + '/ping', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.error || '连接失败');
+            showToast('✅ ' + json.msg);
+        } catch (err) { showToast('❌ ' + err.message, 'error'); }
+        finally { btn.innerText = originalText; btn.disabled = false; }
+    }
+
+    async function saveConfig() {
+        const btn = document.getElementById('btn-save');
+        const payload = {
+            InstID: parseInt(document.getElementById('inp-instId').value),
+            DBType: document.getElementById('inp-dbType').value,
+            Host: document.getElementById('inp-host').value,
+            Port: parseInt(document.getElementById('inp-port').value),
+            DBName: document.getElementById('inp-dbName').value
+        };
+        if (!payload.InstID) { alert("请输入实例 ID"); return; }
+        btn.disabled = true;
+        try {
+            let url = API_BASE + '/', method = 'POST';
+            if (currentMode === 'edit') { url = `${API_BASE}/${payload.InstID}`; method = 'PUT'; }
+            const res = await fetch(url, {
+                method: method, headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            if (!res.ok) throw new Error('请求错误');
+            showToast('保存成功');
+            closeModal();
+            fetchList();
+        } catch (e) { showToast('保存失败: ' + e.message, 'error'); }
+        finally { btn.disabled = false; }
+    }
+
+    // 修改后的删除函数
+    async function deleteItem(id) {
+        const ok = await niceConfirm(`确认删除该实例配置(ID: ${id})吗？此操作不可恢复。`, '确认删除', '删除');
+        if (!ok) return;
+
+        try {
+            const res = await fetch(`${API_BASE}/${id}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Delete failed');
+            showToast('删除成功');
+            fetchList();
+        } catch (e) { showToast('删除失败', 'error'); }
+    }
+
+    function showToast(msg, type = 'success') {
+        const t = document.getElementById('toast');
+        t.innerText = msg;
+        t.className = type === 'success' ? 'toast-success' : 'toast-error';
+        t.style.display = 'block';
+        setTimeout(() => { t.style.display = 'none'; }, 3000);
+    }
+
+    // --- 方案二：通用的防误触关闭弹窗逻辑 (同时应用给两个弹窗) ---
+    function setupModalClose(modalId, closeFn) {
+        const m = document.getElementById(modalId);
+        m.addEventListener('mousedown', function(e) {
+            if (e.target !== this) return; // 只有点击遮罩层起始才处理
+            const onMouseUp = (upEvt) => {
+                if (upEvt.target === this) closeFn(); // 只有点击遮罩层结束才触发
+                document.removeEventListener('mouseup', onMouseUp);
+            };
+            document.addEventListener('mouseup', onMouseUp);
+        });
+    }
+
+    setupModalClose('modal', closeModal);
+    setupModalClose('confirm-modal', () => handleConfirmResponse(false));
+
+    // 额外优化：Esc 键关闭所有弹窗
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeModal();
+            handleConfirmResponse(false);
+        }
+    });
+</script>
+
+</body>
+</html>

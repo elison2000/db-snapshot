@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实例配置管理</title>
+    <style>
+        :root {
+            --el-primary: #409EFF; --el-primary-hover: #66b1ff;
+            --el-success: #67C23A; --el-success-hover: #85ce61;
+            --el-warning: #E6A23C; --el-warning-hover: #ebb563;
+            --el-danger: #F56C6C; --el-danger-hover: #f78989;
+            --el-text-main: #303133; --el-text-regular: #606266; --el-text-secondary: #909399;
+            --el-border-color: #EBEEF5; --el-bg-color: #F5F7FA; --el-border-base: #DCDFE6;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; padding: 5px; background-color: var(--el-bg-color); font-family: "PingFang SC", "Helvetica Neue", Arial, sans-serif; color: var(--el-text-main); }
+        .card { background: #fff; border: 1px solid var(--el-border-color); border-radius: 4px; padding: 12px 20px 8px 20px; margin-bottom: 5px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); }
+        .search-form { display: flex; flex-wrap: wrap; column-gap: 20px; row-gap: 12px; align-items: center; }
+        .form-item-search { display: flex; align-items: center; gap: 8px; font-size: 14px; white-space: nowrap; }
+        .filter-input { height: 32px; padding: 0 10px; border: 1px solid var(--el-border-base); border-radius: 4px; font-size: 13px; color: var(--el-text-regular); outline: none; transition: border-color .2s; }
+        .filter-input:focus { border-color: var(--el-primary); }
+        .header-box { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        h1 { margin: 0; font-size: 16px; font-weight: 600; color: var(--el-text-main); }
+        .table-wrapper { width: 100%; overflow-x: auto; border: 1px solid var(--el-border-color); border-radius: 4px; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; background: #fff; table-layout: fixed; }
+        thead th { background-color: #F8F9FB; color: var(--el-text-regular); font-weight: 600; text-align: left; padding: 12px 15px; border-bottom: 1px solid var(--el-border-color); }
+        tbody td { padding: 10px 15px; border-bottom: 1px solid var(--el-border-color); color: var(--el-text-regular); vertical-align: middle; }
+        tbody tr:hover td { background-color: #F5F7FA; }
+        .text-ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        .pagination-container { padding-top: 15px; display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
+        .page-info { font-size: 13px; color: var(--el-text-secondary); }
+        .btn-page { padding: 0 10px; min-width: 32px; height: 32px; border: 1px solid var(--el-border-base); background: #fff; cursor: pointer; border-radius: 4px; color: var(--el-text-regular); font-size: 13px; outline: none; }
+        .btn-page:disabled { color: #c0c4cc; cursor: not-allowed; }
+        .btn-page.active { background-color: var(--el-primary); color: #fff; border-color: var(--el-primary); }
+        #jumpIdx { width: 50px; height: 32px; border: 1px solid var(--el-border-base); border-radius: 4px; text-align: center; outline: none; font-size: 13px; }
+
+        .btn { height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0 15px; font-size: 13px; border-radius: 4px; border: 1px solid transparent; cursor: pointer; transition: .1s; font-weight: 500; white-space: nowrap; text-decoration: none; }
+        .btn-primary { background-color: var(--el-primary); color: #fff; }
+        .btn-success { background-color: var(--el-success); color: #fff; }
+        .btn-danger { background-color: var(--el-danger); color: #fff; }
+        .btn-warning { background-color: var(--el-warning); color: #fff; }
+        .btn-default { background: #fff; border: 1px solid var(--el-border-base); color: var(--el-text-regular); }
+        .btn:hover { opacity: 0.85; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        .tag { display: inline-block; padding: 2px 8px; font-size: 11px; border-radius: 3px; color: #fff; font-weight: 500; line-height: 1.4; }
+        .tag-primary { background-color: var(--el-primary); }
+        .tag-success { background-color: var(--el-success); }
+        .tag-warning { background-color: var(--el-warning); }
+        .tag-danger  { background-color: var(--el-danger); }
+
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: none; justify-content: center; align-items: center; }
+        .modal-show { display: flex; animation: fadeIn 0.3s; }
+        .modal-box { background: #fff; width: 540px; border-radius: 4px; box-shadow: 0 2px 12px 0 rgba(0,0,0,0.15); overflow: hidden; }
+        .modal-header { padding: 15px 20px; border-bottom: 1px solid #ebeef5; font-size: 16px; font-weight: 600; }
+        .modal-body { padding: 25px 25px 10px 10px; }
+        .modal-footer { padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f0f0f0; }
+        .footer-right { display: flex; gap: 10px; }
+        .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .form-row-port { display: grid; grid-template-columns: auto 1fr; gap: 15px; }
+        .form-item { display: flex; align-items: center; margin-bottom: 18px; gap: 10px; }
+        .form-label { width: 75px; text-align: right; font-size: 13px; color: var(--el-text-regular); flex-shrink: 0; }
+        .form-input, .form-select { flex: 1; background-color: #fff; border-radius: 4px; border: 1px solid var(--el-border-base); height: 32px; padding: 0 10px; font-size: 13px; outline: none; transition: border-color .2s; width: 100%; }
+        .form-input:focus { border-color: var(--el-primary); }
+        #inp-port { width: 80px; flex: none; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        #toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); padding: 10px 20px; border-radius: 4px; font-size: 13px; z-index: 2000; display: none; }
+        .toast-success { background-color: #f0f9eb; color: var(--el-success); border: 1px solid #e1f3d8; }
+        .toast-error { background-color: #fef0f0; color: var(--el-danger); border: 1px solid #fde2e2; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div class="search-form">
+        <div class="form-item-search"><label>实例ID</label><input type="number" id="filter-id" class="filter-input" style="width:80px" placeholder="实例ID" oninput="handleFilterChange()"></div>
+        <div class="form-item-search">
+            <label>数据库类型</label>
+            <select id="filter-type" class="filter-input" onchange="handleFilterChange()">
+                <option value="">全部</option><option value="mysql">MySQL</option><option value="polar">PolarDB</option><option value="tdsqlc">TDSQL-C</option><option value="oracle">Oracle</option><option value="oceanbase">OceanBase</option><option value="pgsql">PostgreSQL</option>
+            </select>
+        </div>
+        <div class="form-item-search"><label>IP 地址</label><input type="text" id="filter-host" class="filter-input" style="width:160px" placeholder="输入IP搜索" oninput="handleFilterChange()"></div>
+        <div class="form-item-search"><button class="btn btn-primary" onclick="resetFilter()">重置</button><button class="btn btn-primary" onclick="fetchList(true)" title="刷新数据">刷新</button></div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="header-box">
+        <h1>实例列表</h1>
+        <div style="display: flex; gap: 10px;"><button class="btn btn-primary" onclick="reloadConfig()" id="btn-reload">↻ 重载配置</button><button class="btn btn-primary" onclick="openModal('create')">+ 新增配置</button></div>
+    </div>
+    <div class="table-wrapper">
+        <table id="data-table">
+            <thead>
+            <tr><th width="90">实例ID</th><th width="110">数据库类型</th><th width="420">数据库地址</th><th width="80">端口</th><th width="140">数据库/服务名</th><th width="240">操作</th></tr>
+            </thead>
+            <tbody id="table-body"></tbody>
+        </table>
+    </div>
+    <div class="pagination-container" id="pagination">
+        <span class="page-info" id="page-info">共 0 条</span>
+        <button class="btn-page" id="btn-prev" onclick="changePage(-1)">上一页</button>
+        <div id="page-numbers" style="display: flex; gap: 5px;"></div>
+        <button class="btn-page" id="btn-next" onclick="changePage(1)">下一页</button>
+        <div style="display: flex; align-items: center; gap: 5px; margin-left: 10px; font-size: 13px; color: var(--el-text-regular);">
+            <span>前往</span><input type="number" id="jumpIdx"><span>页</span>
+            <button class="btn btn-default" style="height: 32px; padding: 0 10px;" onclick="handleManualJump()">确定</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="modal">
+    <div class="modal-box">
+        <div class="modal-header" id="modal-title">新增/编辑</div>
+        <div class="modal-body">
+            <form id="config-form" onsubmit="event.preventDefault(); saveConfig();">
+                <div class="form-row-2">
+                    <div class="form-item"><label class="form-label">实例ID <span style="color:var(--el-danger)">*</span></label><input type="number" id="inp-instId" class="form-input"></div>
+                    <div class="form-item"><label class="form-label">数据库类型</label><select id="inp-dbType" class="form-select"><option value="mysql">MySQL</option><option value="polar">PolarDB</option><option value="tdsqlc">TDSQL-C</option><option value="oracle">Oracle</option><option value="oceanbase">OceanBase</option><option value="pgsql">PostgreSQL</option></select></div>
+                </div>
+                <div class="form-item"><label class="form-label">地址</label><input type="text" id="inp-host" class="form-input" autocomplete="off"></div>
+                <div class="form-row-port">
+                    <div class="form-item"><label class="form-label">端口</label><input type="number" id="inp-port" class="form-input"></div>
+                    <div class="form-item"><label class="form-label" style="width:85px;">数据库/服务名</label><input type="text" id="inp-dbName" class="form-input" autocomplete="off"></div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-warning" id="btn-test" onclick="testConnection()">⚡️ 测试连通性</button>
+            <div class="footer-right"><button class="btn btn-default" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="saveConfig()" id="btn-save">确定</button></div>
+        </div>
+    </div>
+</div>
+
+<div class="modal-overlay" id="confirm-modal">
+    <div class="modal-box" style="width: 380px;"><div class="modal-header" id="confirm-title" style="color: var(--el-danger);">确认操作</div><div class="modal-body" id="confirm-msg" style="padding: 25px 20px; font-size: 14px; line-height: 1.5; color: var(--el-text-regular);">确定要执行此操作吗？</div><div class="modal-footer" style="justify-content: flex-end; gap: 12px; background: #fafafa;"><button class="btn btn-default" onclick="handleConfirmResponse(false)">取消</button><button class="btn btn-danger" id="confirm-ok-btn" onclick="handleConfirmResponse(true)">确定</button></div></div>
+</div>
+<div id="toast"></div>
+
+<script>
+    /* 核心修改 1: 基础路径重构 */
+    const API_BASE = '/db-snapshot';
+    let currentMode = 'create', globalList = [], filteredList = [], currentPage = 1, pageSize = 10, confirmResolver = null;
+
+    fetchList();
+    async function fetchList(manual = false) {
+        const tbody = document.getElementById('table-body'), table = document.getElementById('data-table');
+        table.style.opacity = '0.5';
+        try {
+            /* 核心修改 2: API 路径拼接 */
+            const res = await fetch(API_BASE + '/api/config/');
+            const json = await res.json();
+            globalList = Array.isArray(json) ? json : (json.data || []); applyFilter();
+            if (manual) showToast('数据已刷新');
+        } catch (err) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:var(--el-danger);">加载失败</td></tr>'; }
+        finally { table.style.opacity = '1'; }
+    }
+    function handleFilterChange() { currentPage = 1; applyFilter(); }
+    function applyFilter() {
+        const idVal = document.getElementById('filter-id').value.trim(), typeVal = document.getElementById('filter-type').value.toLowerCase(), hostVal = document.getElementById('filter-host').value.trim();
+        filteredList = globalList.filter(item => {
+            if (idVal && !item.InstID.toString().includes(idVal)) return false;
+            if (typeVal && (item.DBType || '').toLowerCase() !== typeVal) return false;
+            if (hostVal && !(item.Host || '').includes(hostVal)) return false;
+            return true;
+        });
+        renderTable();
+    }
+    function renderTable() {
+        const tbody = document.getElementById('table-body'); const total = filteredList.length, totalPages = Math.ceil(total / pageSize) || 1;
+        if (currentPage > totalPages) currentPage = totalPages;
+        const start = (currentPage - 1) * pageSize, pageData = filteredList.slice(start, start + pageSize);
+        if (pageData.length === 0) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#909399;">暂无数据</td></tr>'; updatePagination(0, 1); return; }
+
+        tbody.innerHTML = pageData.map(item => {
+            const safeItem = JSON.stringify(item).replace(/"/g, '&quot;'), dbType = (item.DBType || '').toLowerCase();
+            let tagClass = 'tag-warning';
+            if (['mysql','polar','tdsqlc'].some(k => dbType.includes(k))) tagClass = 'tag-primary';
+            else if (dbType.includes('oracle')) tagClass = 'tag-danger';
+            else if (['pg','postgre'].some(k => dbType.includes(k))) tagClass = 'tag-success';
+
+            /* 核心修改 3: 跳转链接拼接 */
+            return `<tr>
+                <td style="font-weight:bold;">${item.InstID}</td>
+                <td><span class="tag ${tagClass}">${item.DBType}</span></td>
+                <td class="text-ellipsis" title="${item.Host}">${item.Host}</td>
+                <td>${item.Port}</td>
+                <td class="text-ellipsis" title="${item.DBName}">${item.DBName}</td>
+                <td><div style="display:flex; gap:8px;"><a href="${API_BASE}/dashboard/${item.InstID}" target="_blank" class="btn btn-success">查看</a><button class="btn btn-primary" onclick='openModal("edit", ${safeItem})'>编辑</button><button class="btn btn-primary" onclick='cloneItem(${safeItem})'>克隆</button><button class="btn btn-danger" onclick="deleteItem(${item.InstID})">删除</button></div></td>
+            </tr>`;
+        }).join('');
+        updatePagination(total, totalPages);
+    }
+    function updatePagination(total, totalPages) {
+        document.getElementById('page-info').innerText = `共 ${total} 条`;
+        document.getElementById('btn-prev').disabled = currentPage === 1;
+        document.getElementById('btn-next').disabled = currentPage === totalPages || totalPages === 0;
+        const pageNumbers = document.getElementById('page-numbers'); let html = '';
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) { html += `<button class="btn-page ${i === currentPage ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`; }
+            else if (i === currentPage - 3 || i === currentPage + 3) { html += '<span style="color:#C0C4CC; padding: 0 3px;">...</span>'; }
+        }
+        pageNumbers.innerHTML = html;
+    }
+    function goToPage(p) { currentPage = p; renderTable(); }
+    function handleManualJump() { const idx = parseInt(document.getElementById('jumpIdx').value), totalPages = Math.ceil(filteredList.length / pageSize) || 1; if (idx >= 1 && idx <= totalPages) { goToPage(idx); } }
+    function changePage(step) { currentPage += step; renderTable(); }
+    function resetFilter() { document.getElementById('filter-id').value = ''; document.getElementById('filter-type').value = ''; document.getElementById('filter-host').value = ''; handleFilterChange(); }
+    function openModal(mode, data = null) {
+        currentMode = mode; const modal = document.getElementById('modal'), instInput = document.getElementById('inp-instId');
+        modal.classList.add('modal-show');
+        if (mode === 'create') { document.getElementById('modal-title').innerText = '新增配置'; document.getElementById('config-form').reset(); instInput.removeAttribute('readonly'); }
+        else if (mode === 'edit') { document.getElementById('modal-title').innerText = '编辑配置'; fillForm(data); instInput.setAttribute('readonly', 'true'); }
+        else if (mode === 'clone') { document.getElementById('modal-title').innerText = '克隆配置'; fillForm(data); instInput.value = ''; instInput.removeAttribute('readonly'); currentMode = 'create'; }
+    }
+    function fillForm(data) { document.getElementById('inp-instId').value = data.InstID; document.getElementById('inp-dbType').value = (data.DBType || 'mysql').toLowerCase(); document.getElementById('inp-host').value = data.Host; document.getElementById('inp-port').value = data.Port; document.getElementById('inp-dbName').value = data.DBName; }
+    function cloneItem(data) { openModal('clone', data); }
+    function closeModal() { document.getElementById('modal').classList.remove('modal-show'); }
+    function niceConfirm(msg, title = '确认操作', okText = '确定') { const cModal = document.getElementById('confirm-modal'); document.getElementById('confirm-msg').innerText = msg; document.getElementById('confirm-title').innerText = title; document.getElementById('confirm-ok-btn').innerText = okText; cModal.classList.add('modal-show'); return new Promise((resolve) => { confirmResolver = resolve; }); }
+    function handleConfirmResponse(result) { document.getElementById('confirm-modal').classList.remove('modal-show'); if (confirmResolver) confirmResolver(result); }
+
+    /* 核心修改 4: 重载 API 路径拼接 */
+    async function reloadConfig() {
+        const ok = await niceConfirm('确定要重载服务端配置吗？', '系统重载', '重载'); if (!ok) return;
+        try {
+            const res = await fetch(API_BASE + '/api/config/reload');
+            if (!res.ok) throw new Error(); showToast('配置重载成功');
+        } catch (e) { showToast('重载出错', 'error'); }
+    }
+
+    /* 核心修改 5: 测试 API 路径拼接 */
+    async function testConnection() {
+        const btn = document.getElementById('btn-test'), payload = { DBType: document.getElementById('inp-dbType').value, Host: document.getElementById('inp-host').value, Port: parseInt(document.getElementById('inp-port').value), DBName: document.getElementById('inp-dbName').value };
+        if (!payload.Host || !payload.Port) { showToast('Host 和 端口 不能为空', 'error'); return; }
+        btn.innerText = '连接中...'; btn.disabled = true;
+        try {
+            const res = await fetch(API_BASE + '/api/config/ping', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+            const json = await res.json(); if (!res.ok) throw new Error(json.error); showToast('✅ ' + json.msg);
+        } catch (err) { showToast('❌ ' + err.message, 'error'); }
+        finally { btn.innerText = '⚡️ 测试连通性'; btn.disabled = false; }
+    }
+
+    /* 核心修改 6: 保存 API 路径拼接 */
+    async function saveConfig() {
+        const payload = { InstID: parseInt(document.getElementById('inp-instId').value), DBType: document.getElementById('inp-dbType').value, Host: document.getElementById('inp-host').value, Port: parseInt(document.getElementById('inp-port').value), DBName: document.getElementById('inp-dbName').value };
+        if (!payload.InstID) { showToast("请输入实例ID", 'error'); return; }
+        try {
+            let url = API_BASE + '/api/config/', method = 'POST';
+            if (currentMode === 'edit') { url = `${API_BASE}/api/config/${payload.InstID}`; method = 'PUT'; }
+            const res = await fetch(url, { method: method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+            if (!res.ok) throw new Error(); showToast('保存成功'); closeModal(); fetchList();
+        } catch (e) { showToast('保存失败', 'error'); }
+    }
+
+    /* 核心修改 7: 删除 API 路径拼接 */
+    async function deleteItem(id) {
+        const ok = await niceConfirm(`确认删除 ID=${id} 的配置吗？`, '确认删除', '删除'); if (!ok) return;
+        try {
+            const res = await fetch(`${API_BASE}/api/config/${id}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error(); showToast('删除成功'); fetchList();
+        } catch (e) { showToast('删除失败', 'error'); }
+    }
+
+    function showToast(msg, type = 'success') { const t = document.getElementById('toast'); t.innerText = msg; t.className = type === 'success' ? 'toast-success' : 'toast-error'; t.style.display = 'block'; setTimeout(() => { t.style.display = 'none'; }, 3000); }
+    function setupModalClose(modalId, closeFn) { const m = document.getElementById(modalId); m.addEventListener('mousedown', function(e) { if (e.target !== this) return; const onMouseUp = (upEvt) => { if (upEvt.target === this) closeFn(); document.removeEventListener('mouseup', onMouseUp); }; document.addEventListener('mouseup', onMouseUp); }); }
+    setupModalClose('modal', closeModal); setupModalClose('confirm-modal', () => handleConfirmResponse(false));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeModal(); handleConfirmResponse(false); } });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据库快照系统</title>
+    <style>
+        /* 全局变量 */
+        :root {
+            --bg-color: #dbeafe; /* 外部背景色，稍微深一点的蓝灰 */
+            --container-bg: #eff6ff; /* 主卡片背景，极淡的蓝 */
+            --primary-blue: #3b82f6;
+            --text-dark: #1e3a8a; /* 深海军蓝，用于标题 */
+            --text-gray: #475569; /* 正文灰 */
+            --card-white: #ffffff;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: #cbd5e1; /* 浏览器背景 */
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 主容器 - 模仿图中那个大的圆角矩形 */
+        .main-container {
+            width: 90%;
+            max-width: 1000px;
+            background-color: #f1f5f9; /* 接近图中的背景色 */
+            border-radius: 24px;
+            padding: 60px 80px;
+            box-shadow: var(--shadow-md);
+            display: flex;
+            align-items: center;
+            gap: 60px;
+            min-height: 400px;
+        }
+
+        /* 左侧文字区 */
+        .left-section {
+            flex: 1.2; /* 稍微宽一点 */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        /* 版本号 Badge */
+        .badge {
+            display: inline-block;
+            background-color: #dbeafe;
+            color: #1e40af;
+            font-size: 14px;
+            font-weight: 600;
+            padding: 6px 16px;
+            border-radius: 999px; /* Pill shape */
+            width: fit-content;
+            margin-bottom: 24px;
+        }
+
+        /* 大标题 */
+        h1 {
+            font-size: 42px;
+            font-weight: 800;
+            color: #0f172a; /* 接近黑色的深蓝 */
+            margin: 0 0 24px 0;
+            letter-spacing: -0.02em;
+        }
+
+        /* 描述文字 */
+        .description {
+            font-size: 16px;
+            line-height: 1.8;
+            color: #64748b;
+            text-align: justify;
+            margin: 0;
+        }
+
+        /* 右侧卡片区 */
+        .right-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* 导航卡片 */
+        .nav-card {
+            background-color: var(--card-white);
+            border-radius: 16px;
+            padding: 24px 32px;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .nav-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-hover);
+            border-color: #bfdbfe;
+        }
+
+        /* 图标容器 */
+        .icon-box {
+            width: 56px;
+            height: 56px;
+            background-color: #eff6ff; /* 极淡蓝 */
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            color: var(--primary-blue);
+            transition: background-color 0.3s;
+        }
+
+        .nav-card:hover .icon-box {
+            background-color: #dbeafe;
+        }
+
+        .nav-card svg {
+            width: 28px;
+            height: 28px;
+        }
+
+        /* 卡片文字 */
+        .card-text h2 {
+            margin: 0 0 6px 0;
+            font-size: 18px;
+            font-weight: 700;
+            color: #1e293b;
+        }
+
+        .card-text p {
+            margin: 0;
+            font-size: 14px;
+            color: #94a3b8;
+        }
+
+        /* 响应式适配 */
+        @media (max-width: 800px) {
+            .main-container {
+                flex-direction: column;
+                padding: 40px;
+                height: auto;
+                text-align: center;
+            }
+            .left-section {
+                align-items: center;
+                margin-bottom: 40px;
+            }
+            .badge {
+                margin-left: auto;
+                margin-right: auto;
+            }
+            .right-section {
+                width: 100%;
+            }
+            .nav-card {
+                justify-content: flex-start;
+                text-align: left;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="main-container">
+    <div class="left-section">
+        <div class="badge">DBSnapshot v1.1.0</div>
+        <h1>数据库快照</h1>
+        <p class="description">
+            数据库历史性能回溯与分析平台。通过自动采集数据库性能视图数据，持续记录连接、会话、事务、锁等关键指标，支持按时间维度回放数据库状态，帮助快速定位和复盘历史性能问题。
+        </p>
+    </div>
+
+    <div class="right-section">
+        <a href="/db-snapshot/dashboard" class="nav-card">
+            <div class="icon-box">
+                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                </svg>
+            </div>
+            <div class="card-text">
+                <h2>监控大盘</h2>
+                <p>进入可视化分析中心</p>
+            </div>
+        </a>
+
+        <a href="/db-snapshot/config" class="nav-card">
+            <div class="icon-box">
+                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+            </div>
+            <div class="card-text">
+                <h2>配置管理</h2>
+                <p>添加或修改数据库实例</p>
+            </div>
+        </a>
+    </div>
+</div>
+
+</body>
+</html>

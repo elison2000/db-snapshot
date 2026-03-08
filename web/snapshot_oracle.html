@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oracle快照</title>
+    <script defer src="/db-snapshot/static/alpinejs.min.js"></script>
+    <link href="/db-snapshot/static/fonts/font-awesome.min.css" rel="stylesheet">
+    <link href="/db-snapshot/static/style.css" rel="stylesheet">
+</head>
+
+<body x-data="snapshotViewer">
+
+    <!-- 基础信息 -->
+    <div class="base-info">
+        <div class="base-info-left">
+            <div class="base-info-item">
+                <span class="base-info-label">实例:</span>
+                <span x-text="baseInfo.inst_id"></span>
+                <span style="margin: 0 5px; color: #ccc;">|</span>
+                <span x-text="baseInfo.inst_name"></span>
+            </div>
+        </div>
+        <div class="base-info-right">
+            <div class="base-info-item">
+                <span class="base-info-label">创建时间:</span>
+                <span x-text="baseInfo.create_time"></span>
+                <button @click="exportToHtml" class="copy-btn" style="margin-left: 15px;">
+                    <i class="fa fa-download"></i> 导出HTML
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 摘要信息表格 -->
+    <div class="table-container summary-table-container">
+        <table class="summary-table">
+            <thead>
+                <tr>
+                    <th>活动会话数</th>
+                    <th>事务数</th>
+                    <th>总连接数</th>
+                    <th>长查询数</th>
+                    <th>最长查询耗时(s)</th>
+                    <th>长事务数</th>
+                    <th>最长事务耗时(s)</th>
+                    <th>被阻塞会话数</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><span class="summary-value summary-link"
+                            @click="scrollToSection('activeSessions', 'activeSessions')"
+                            x-text="summary.ActSessCount"></span></td>
+                    <td><span class="summary-value summary-link"
+                            @click="scrollToSection('transactions', 'transactions')" x-text="summary.TxnCount"></span>
+                    </td>
+                    <td><span class="summary-value summary-link"
+                            @click="scrollToSection('sessionCounts', 'sessionCounts')"
+                            x-text="summary.SessCount"></span></td>
+                    <td><span class="summary-value" x-text="summary.LongQueryCount"></span></td>
+                    <td><span class="summary-value" x-text="summary.MaxQuerySeconds"></span></td>
+                    <td><span class="summary-value" x-text="summary.LongTxnCount"></span></td>
+                    <td><span class="summary-value" x-text="summary.MaxTxnSeconds"></span></td>
+                    <td><span class="summary-value" x-text="summary.BlockedSessCount"></span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 长操作 -->
+    <div class="section-header" id="longOps">
+        <h3 @click="toggleSection('longOps')" style="cursor: pointer;">长操作</h3>
+        <button class="collapse-btn" @click="toggleSection('longOps')">
+            <span x-text="sections.longOps ? '收起' : '展开'"></span>
+            <i class="fa" :class="sections.longOps ? 'fa-angle-up' : 'fa-angle-down'"></i>
+        </button>
+    </div>
+    <div class="table-container" x-show="sections.longOps" x-transition>
+        <table>
+            <thead>
+                <tr>
+                    <th>创建时间</th>
+                    <th>会话ID</th>
+                    <th class="text-right">序列号</th>
+                    <th>用户名</th>
+                    <th>SQL ID</th>
+                    <th class="text-right">剩余时间(秒)</th>
+                    <th class="text-right">已用时间(秒)</th>
+                    <th class="text-right">完成进度</th>
+                    <th>操作名称</th>
+                    <th>目标</th>
+                    <th>目标描述</th>
+                    <th class="text-right">已完成工作量</th>
+                    <th class="text-right">总工作量</th>
+                    <th>工作量单位</th>
+                    <th>开始时间</th>
+                    <th>最后更新时间</th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="(op, index) in longOps" :key="op.sid || index">
+                    <tr>
+                        <td x-text="op.create_time || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="op.session_id !== undefined && op.session_id !== null ? op.session_id : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="op.serial !== undefined && op.serial !== null ? op.serial : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="op.username || '-'" class="whitespace-nowrap"></td>
+                        <td><a href="#" class="link" @click.prevent="showSqlInfo(op.sql_id, $event)"
+                                x-text="op.sql_id || '-'"></a></td>
+                        <td x-text="op.time_remaining !== undefined && op.time_remaining !== null ? op.time_remaining : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="op.elapsed_seconds !== undefined && op.elapsed_seconds !== null ? op.elapsed_seconds : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="(op.completed_pct !== undefined && op.completed_pct !== null ? op.completed_pct : '-') + '%'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="op.op_name || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="op.target || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="op.target_desc || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="op.so_far !== undefined && op.so_far !== null ? op.so_far : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="op.total_work !== undefined && op.total_work !== null ? op.total_work : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="op.units || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="op.start_time || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="op.last_update_time || '-'" class="whitespace-nowrap"></td>
+                    </tr>
+                </template>
+                <tr x-show="longOps.length === 0">
+                    <td colspan="16" style="text-align: center; padding: 40px; color: #999;">
+                        <i class="fa fa-file-text-o" style="font-size: 32px; margin-bottom: 10px; color: #e0e0e0;"></i>
+                        <div>暂无长操作数据</div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 活动会话 -->
+    <div class="section-header" id="activeSessions">
+        <h3 @click="toggleSection('activeSessions')" style="cursor: pointer;">活动会话</h3>
+        <button class="collapse-btn" @click="toggleSection('activeSessions')">
+            <span x-text="sections.activeSessions ? '收起' : '展开'"></span>
+            <i class="fa" :class="sections.activeSessions ? 'fa-angle-up' : 'fa-angle-down'"></i>
+        </button>
+    </div>
+    <div class="table-container" x-show="sections.activeSessions" x-transition>
+        <table>
+            <thead>
+                <tr>
+                    <th>创建时间</th>
+                    <th class="text-right">会话ID</th>
+                    <th class="text-right">序列号</th>
+                    <th>用户名</th>
+                    <th>程序</th>
+                    <th>客户端</th>
+                    <th>SQL ID</th>
+                    <th>上一条SQL ID</th>
+                    <th class="text-right">执行时间(秒)</th>
+                    <th class="text-right">阻塞会话</th>
+                    <th class="text-right">最终阻塞会话</th>
+                    <th>等待事件</th>
+                    <th>等待类别</th>
+                    <th>状态</th>
+                    <th class="text-right">等待时间(秒)</th>
+                    <th class="text-right">P1</th>
+                    <th class="text-right">P2</th>
+                    <th class="text-right">P3</th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="(session, index) in activeSessions" :key="session.session_id || index">
+                    <tr>
+                        <td x-text="session.create_time || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="session.session_id !== undefined && session.session_id !== null ? session.session_id : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="session.serial !== undefined && session.serial !== null ? session.serial : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="session.username || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="session.program || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="session.client || '-'" class="whitespace-nowrap"></td>
+                        <td><a href="#" class="link" @click.prevent="showSqlInfo(session.sql_id, $event)"
+                                x-text="session.sql_id || '-'"></a></td>
+                        <td><a href="#" class="link" @click.prevent="showSqlInfo(session.prev_sql_id, $event)"
+                                x-text="session.prev_sql_id || '-'"></a></td>
+                        <td x-text="session.exec_sec !== undefined && session.exec_sec !== null ? session.exec_sec : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="session.blocking_session !== undefined && session.blocking_session !== null ? session.blocking_session : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="session.final_blocking_session !== undefined && session.final_blocking_session !== null ? session.final_blocking_session : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="session.wait_event || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="session.wait_class || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="session.state || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="session.wait_sec !== undefined && session.wait_sec !== null ? session.wait_sec : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="session.p1 !== undefined && session.p1 !== null ? session.p1 : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="session.p2 !== undefined && session.p2 !== null ? session.p2 : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="session.p3 !== undefined && session.p3 !== null ? session.p3 : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                    </tr>
+                </template>
+                <tr x-show="activeSessions.length === 0">
+                    <td colspan="18" style="text-align: center; padding: 40px; color: #999;">
+                        <i class="fa fa-user-circle-o"
+                            style="font-size: 32px; margin-bottom: 10px; color: #e0e0e0;"></i>
+                        <div>暂无活动会话</div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 事务 -->
+    <div class="section-header" id="transactions">
+        <h3 @click="toggleSection('transactions')" style="cursor: pointer;">事务</h3>
+        <button class="collapse-btn" @click="toggleSection('transactions')">
+            <span x-text="sections.transactions ? '收起' : '展开'"></span>
+            <i class="fa" :class="sections.transactions ? 'fa-angle-up' : 'fa-angle-down'"></i>
+        </button>
+    </div>
+    <div class="table-container" x-show="sections.transactions" x-transition>
+        <table>
+            <thead>
+                <tr>
+                    <th>创建时间</th>
+                    <th>事务ID</th>
+                    <th class="text-right">会话ID</th>
+                    <th>用户名</th>
+                    <th>客户端</th>
+                    <th>程序</th>
+                    <th>状态</th>
+                    <th>命令类型</th>
+                    <th>SQL ID</th>
+                    <th>上一条SQL ID</th>
+                    <th>等待类别</th>
+                    <th>等待事件</th>
+                    <th class="text-right">阻塞会话</th>
+                    <th class="text-right">执行时间(秒)</th>
+                    <th>事务状态</th>
+                    <th>事务开始时间</th>
+                    <th class="text-right">事务耗时(秒)</th>
+                    <th class="text-right">CR Get</th>
+                    <th class="text-right">Phy IO</th>
+                    <th class="text-right">Used Blocks</th>
+                    <th class="text-right">Undo Rows</th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="(txn, index) in transactions" :key="txn.txn_id || index">
+                    <tr>
+                        <td x-text="txn.create_time || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="txn.txn_id || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="txn.session_id !== undefined && txn.session_id !== null ? txn.session_id : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="txn.username || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="txn.client || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="txn.program || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="txn.status || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="txn.command_type || '-'" class="whitespace-nowrap"></td>
+                        <td><a href="#" class="link" @click.prevent="showSqlInfo(txn.sql_id, $event)"
+                                x-text="txn.sql_id || '-'"></a></td>
+                        <td><a href="#" class="link" @click.prevent="showSqlInfo(txn.prev_sql_id, $event)"
+                                x-text="txn.prev_sql_id || '-'"></a></td>
+                        <td x-text="txn.wait_class || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="txn.wait_event || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="txn.blocking_session !== undefined && txn.blocking_session !== null ? txn.blocking_session : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="txn.exec_sec !== undefined && txn.exec_sec !== null ? txn.exec_sec : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="txn.txn_state || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="txn.txn_start_time || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="txn.txn_exec_sec !== undefined && txn.txn_exec_sec !== null ? txn.txn_exec_sec : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="txn.cr_get !== undefined && txn.cr_get !== null ? txn.cr_get : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="txn.phy_io !== undefined && txn.phy_io !== null ? txn.phy_io : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="txn.used_blocks !== undefined && txn.used_blocks !== null ? txn.used_blocks : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="txn.undo_rows !== undefined && txn.undo_rows !== null ? txn.undo_rows : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                    </tr>
+                </template>
+                <tr x-show="transactions.length === 0">
+                    <td colspan="21" style="text-align: center; padding: 40px; color: #999;">
+                        <i class="fa fa-exchange" style="font-size: 32px; margin-bottom: 10px; color: #e0e0e0;"></i>
+                        <div>暂无事务数据</div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 阻塞会话 -->
+    <div class="section-header" id="blockingSessions">
+        <h3 @click="toggleSection('blockingSessions')" style="cursor: pointer;">阻塞会话</h3>
+        <button class="collapse-btn" @click="toggleSection('blockingSessions')">
+            <span x-text="sections.blockingSessions ? '收起' : '展开'"></span>
+            <i class="fa" :class="sections.blockingSessions ? 'fa-angle-up' : 'fa-angle-down'"></i>
+        </button>
+    </div>
+    <div class="table-container" x-show="sections.blockingSessions" x-transition>
+        <table>
+            <thead>
+                <tr>
+                    <th>创建时间</th>
+                    <th class="text-right">会话ID</th>
+                    <th class="text-right">序列号</th>
+                    <th>用户名</th>
+                    <th>客户端</th>
+                    <th>程序</th>
+                    <th>命令类型</th>
+                    <th>SQL ID</th>
+                    <th>上一条SQL ID</th>
+                    <th>状态</th>
+                    <th>等待状态</th>
+                    <th>等待类别</th>
+                    <th>等待事件</th>
+                    <th>登录时间</th>
+                    <th class="text-right">等待时间(秒)</th>
+                    <th class="text-right">执行时间(秒)</th>
+                    <th class="text-right">阻塞会话</th>
+                    <th class="text-right">最终阻塞会话</th>
+                    <th class="text-right">P1</th>
+                    <th class="text-right">P2</th>
+                    <th class="text-right">P3</th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="(session, index) in blockingSessions" :key="session.session_id || index">
+                    <tr>
+                        <td x-text="session.create_time || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="session.session_id !== undefined && session.session_id !== null ? session.session_id : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="session.serial !== undefined && session.serial !== null ? session.serial : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="session.username || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="session.client || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="session.program || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="session.command_type || '-'" class="whitespace-nowrap"></td>
+                        <td><a href="#" class="link" @click.prevent="showSqlInfo(session.sql_id, $event)"
+                                x-text="session.sql_id || '-'"></a></td>
+                        <td><a href="#" class="link" @click.prevent="showSqlInfo(session.prev_sql_id, $event)"
+                                x-text="session.prev_sql_id || '-'"></a></td>
+                        <td x-text="session.status || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="session.state || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="session.wait_class || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="session.wait_event || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="session.logon_time || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="session.wait_sec !== undefined && session.wait_sec !== null ? session.wait_sec : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="session.exec_sec !== undefined && session.exec_sec !== null ? session.exec_sec : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="session.blocking_session !== undefined && session.blocking_session !== null ? session.blocking_session : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="session.final_blocking_session !== undefined && session.final_blocking_session !== null ? session.final_blocking_session : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="session.p1 !== undefined && session.p1 !== null ? session.p1 : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="session.p2 !== undefined && session.p2 !== null ? session.p2 : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="session.p3 !== undefined && session.p3 !== null ? session.p3 : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                    </tr>
+                </template>
+                <tr x-show="blockingSessions.length === 0">
+                    <td colspan="21" style="text-align: center; padding: 40px; color: #999;">
+                        <i class="fa fa-ban" style="font-size: 32px; margin-bottom: 10px; color: #e0e0e0;"></i>
+                        <div>暂无阻塞会话</div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 会话统计 -->
+    <div class="section-header" id="sessionCounts">
+        <h3 @click="toggleSection('sessionCounts')" style="cursor: pointer;">连接汇总</h3>
+        <button class="collapse-btn" @click="toggleSection('sessionCounts')">
+            <span x-text="sections.sessionCounts ? '收起' : '展开'"></span>
+            <i class="fa" :class="sections.sessionCounts ? 'fa-angle-up' : 'fa-angle-down'"></i>
+        </button>
+    </div>
+    <div x-show="sections.sessionCounts" x-transition>
+        <div class="grid-col-2">
+            <div>
+                <h4>按用户统计</h4>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>用户名</th>
+                                <th class="text-right">会话数</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="(item, index) in userSessionCounts" :key="index">
+                                <tr>
+                                    <td x-text="item.username || '-'"></td>
+                                    <td x-text="item.count !== undefined && item.count !== null ? item.count : '-'"
+                                        class="text-right"></td>
+                                </tr>
+                            </template>
+                            <tr x-show="userSessionCounts.length === 0">
+                                <td colspan="2" style="text-align: center; color: #999;">无数据</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div>
+                <h4>按客户端统计</h4>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>客户端</th>
+                                <th class="text-right">会话数</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <template x-for="(item, index) in clientSessionCounts" :key="index">
+                                <tr>
+                                    <td x-text="item.client"></td>
+                                    <td x-text="item.count !== undefined && item.count !== null ? item.count : '-'"
+                                        class="text-right"></td>
+                                </tr>
+                            </template>
+                            <tr x-show="clientSessionCounts.length === 0">
+                                <td colspan="2" style="text-align: center; color: #999;">无数据</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SQL信息 -->
+    <div class="section-header" id="sqlInfo">
+        <h3 @click="toggleSection('sqlInfo')" style="cursor: pointer;">SQL信息</h3>
+        <button class="collapse-btn" @click="toggleSection('sqlInfo')">
+            <span x-text="sections.sqlInfo ? '收起' : '展开'"></span>
+            <i class="fa" :class="sections.sqlInfo ? 'fa-angle-up' : 'fa-angle-down'"></i>
+        </button>
+    </div>
+    <div class="table-container" x-show="sections.sqlInfo" x-transition>
+        <table>
+            <thead>
+                <tr>
+                    <th>SQL ID</th>
+                    <th>最后活跃时间</th>
+                    <th class="text-right">执行次数</th>
+                    <th class="text-right">执行时间(秒)</th>
+                    <th class="text-right">平均执行时间(秒)</th>
+                    <th>SQL 文本</th>
+                </tr>
+            </thead>
+            <tbody>
+                <template x-for="(sql, index) in sqlInfo" :key="sql.sql_id || index">
+                    <tr>
+                        <td><a href="#" class="link" @click.prevent="showSqlInfo(sql.sql_id, $event)"
+                                x-text="sql.sql_id || '-'"></a></td>
+                        <td x-text="sql.last_active_time || '-'" class="whitespace-nowrap"></td>
+                        <td x-text="sql.executions !== undefined && sql.executions !== null ? sql.executions : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="sql.exec_sec !== undefined && sql.exec_sec !== null ? sql.exec_sec : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td x-text="sql.avg_exec_sec !== undefined && sql.avg_exec_sec !== null ? sql.avg_exec_sec : '-'"
+                            class="whitespace-nowrap text-right"></td>
+                        <td>
+                            <div class="max-w-xs truncate" :title="sql.sql_text">
+                                <span x-text="sql.sql_text || '-'"> </span>
+                            </div>
+                        </td>
+                    </tr>
+                </template>
+                <tr x-show="sqlInfo.length === 0">
+                    <td colspan="6" style="text-align: center; padding: 20px; color: #999;">
+                        没有数据
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Popover 弹窗 -->
+    <div x-show="showPopover" style="display: none;">
+        <div class="popover-mask" @click="showPopover = false"></div>
+        <div class="popover" x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0"
+            x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0"
+            x-transition:leave-end="opacity-0 translate-y-1">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <div class="popover-title" style="margin-bottom: 0;">SQL详情信息</div>
+                <button @click="showPopover = false"
+                    style="background: none; border: none; cursor: pointer; color: #909399; font-size: 16px;">
+                    <i class="fa fa-times"></i>
+                </button>
+            </div>
+            <div class="popover-content">
+                <template x-if="currentSql">
+                    <div>
+                        <!-- 第一行：SQL ID 和 最后活跃时间 -->
+                        <div class="grid-col-5">
+                            <div class="detail-item">
+                                <span class="detail-label">SQL ID</span>
+                                <div class="sql-detail-value" x-text="currentSql.sql_id"></div>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">执行次数</span>
+                                <div class="sql-detail-value" x-text="currentSql.executions || '-'"></div>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">总耗时(秒)</span>
+                                <div class="sql-detail-value" x-text="(currentSql.exec_sec || '-') "></div>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">平均耗时(秒)</span>
+                                <div class="sql-detail-value" x-text="(currentSql.avg_exec_sec || '-')"></div>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">最后活跃时间</span>
+                                <div class="sql-detail-value" x-text="currentSql.last_active_time || '-'"></div>
+                            </div>
+                        </div>
+
+                        <!-- SQL 文本区域 -->
+                        <div class="sql-detail-item">
+                            <div class="sql-text-header">
+                                <span class="detail-label" style="margin-bottom: 0;">SQL文本:</span>
+                                <button class="copy-btn" @click="copyToClipboard(currentSql.sql_text)">
+                                    <i class="fa fa-clipboard"></i> 复制
+                                </button>
+                            </div>
+                            <div class="sql-detail-value" x-text="currentSql.sql_text"></div>
+                        </div>
+                    </div>
+                </template>
+                <template x-if="!currentSql">
+                    <div style="text-align: center; padding: 20px; color: #909399;">
+                        未找到该 SQL ID 的详细信息
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- 回到顶部按钮 -->
+    <button class="back-to-top" :class="{'show': showBackToTop}" @click="window.scrollTo({top: 0, behavior: 'smooth'})">
+        <i class="fa fa-arrow-up"></i>
+    </button>
+
+    <!-- JavaScript -->
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.data('snapshotViewer', () => ({
+                // 状态控制
+                showPopover: false,
+                currentSql: null,
+                showBackToTop: false,
+                sections: {
+                    longOps: true,
+                    activeSessions: true,
+                    transactions: true,
+                    blockingSessions: true,
+                    sessionCounts: true,
+                    sqlInfo: true
+                },
+
+                // 基础信息
+                baseInfo: {
+                    inst_id: '-',
+                    inst_name: '-',
+                    create_time: '-'
+                },
+
+                // URL 参数
+                urlParams: {
+                    instId: '',
+                    snapshotId: ''
+                },
+
+                // 摘要数据
+                summary: {
+                    ActSessCount: 0,
+                    TxnCount: 0,
+                    SessCount: 0,
+                    BigQueryCount: 0,
+                    WaitSessCount: 0,
+                    LockCount: 0,
+                    MaxQuerySeconds: 0,
+                    MaxTxnSeconds: 0
+                },
+
+                // 数据列表
+                activeSessions: [],
+                transactions: [],
+                blockingSessions: [],
+                longOps: [],
+                userSessionCounts: [],
+                clientSessionCounts: [],
+                sqlInfo: [],
+
+                async fetchData() {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    // 仅从 URL 查询参数获取
+                    let instId = urlParams.get('inst_id');
+                    let snapshotId = urlParams.get('snapshot_id');
+                    
+                    this.urlParams.instId = instId;
+                    this.urlParams.snapshotId = snapshotId;
+
+                    if (!instId || !snapshotId) {
+                        console.error("Missing inst_id or snapshot_id in URL");
+                        return;
+                    }
+
+                    try {
+                        const response = await fetch(`/db-snapshot/api/snapshot/${instId}/${snapshotId}`);
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        const data = await response.json();
+
+                        // 映射数据
+                        this.baseInfo = data.base || {};
+                        this.summary = data.summary || {};
+                        this.activeSessions = data.active_sessions || [];
+                        this.transactions = data.transactions || [];
+                        this.blockingSessions = data.blocking_sessions || [];
+                        this.longOps = data.long_ops || [];
+                        this.userSessionCounts = data.user_session_counts || [];
+                        this.clientSessionCounts = data.client_session_counts || [];
+                        this.sqlInfo = data.sql_info || [];
+
+                    } catch (error) {
+                        console.error("Failed to fetch snapshot data:", error);
+                        alert("获取快照数据失败: " + error.message);
+                    }
+                },
+
+                init() {
+                    window.addEventListener('scroll', () => {
+                        this.showBackToTop = window.scrollY > 300;
+                    });
+                    this.fetchData();
+                },
+
+                // 方法
+                toggleSection(section) {
+                    this.sections[section] = !this.sections[section];
+                },
+
+                scrollToSection(sectionKey, elementId) {
+                    // 确保目标板块已展开
+                    if (!this.sections[sectionKey]) {
+                        this.sections[sectionKey] = true;
+                    }
+
+                    // 等待 DOM 更新后滚动
+                    this.$nextTick(() => {
+                        const element = document.getElementById(elementId);
+                        if (element) {
+                            const offset = 20;
+                            const elementPosition = element.getBoundingClientRect().top + window.scrollY;
+                            const offsetPosition = elementPosition - offset;
+
+                            window.scrollTo({
+                                top: offsetPosition,
+                                behavior: "smooth"
+                            });
+                        }
+                    });
+                },
+
+                showSqlInfo(sqlId) {
+                    if (!sqlId || sqlId === '-') return;
+
+                    // 查找对应的 SQL 信息
+                    const sql = this.sqlInfo.find(s => s.sql_id === sqlId);
+                    if (sql) {
+                        this.currentSql = sql;
+                    } else {
+                        // 如果在当前 SQL 列表中找不到，创建一个临时的对象显示
+                        this.currentSql = {
+                            sql_id: sqlId,
+                            sql_text: '在当前快照的 SQL 信息列表中未找到详细文本',
+                            last_active_time: '-',
+                            executions: '-',
+                            exec_sec: '-',
+                            avg_exec_sec: '-'
+                        };
+                    }
+
+                    this.showPopover = true;
+                },
+
+                async copyToClipboard(text, event) {
+                    if (!text) return;
+
+                    const showSuccess = () => {
+                        // 如果传入了事件对象，优先使用事件目标
+                        let btn = null;
+                        if (event && event.target) {
+                            // 向上寻找 .copy-btn，因为可能点击的是图标
+                            btn = event.target.closest('.copy-btn');
+                        }
+                        
+                        // 降级：如果在弹窗中，尝试查找弹窗内的复制按钮
+                        if (!btn) {
+                            btn = document.querySelector('.popover-content .copy-btn');
+                        }
+
+                        // 最后降级：查找页面上任意一个复制按钮（这可能导致误伤，比如选中了导出按钮）
+                        // 但由于我们现在的导出按钮也用了 .copy-btn 类，这正是问题所在
+                        // 所以这里只处理找到确切按钮的情况
+                        if (btn) {
+                            const originalText = btn.innerHTML;
+                            btn.innerHTML = '<i class="fa fa-check"></i> 已复制';
+                            setTimeout(() => {
+                                btn.innerHTML = originalText;
+                            }, 2000);
+                        }
+                    };
+
+                    // 优先尝试 navigator.clipboard
+                    if (navigator.clipboard && window.isSecureContext) {
+                        try {
+                            await navigator.clipboard.writeText(text);
+                            showSuccess();
+                            return;
+                        } catch (err) {
+                            console.error('Clipboard API failed, trying fallback: ', err);
+                        }
+                    }
+
+                    // 降级方案: document.execCommand
+                    const textArea = document.createElement("textarea");
+                    textArea.value = text;
+
+                    // 确保不影响页面布局
+                    textArea.style.position = "fixed";
+                    textArea.style.left = "-9999px";
+                    textArea.style.top = "0";
+
+                    document.body.appendChild(textArea);
+                    textArea.focus();
+                    textArea.select();
+
+                    try {
+                        const successful = document.execCommand('copy');
+                        if (successful) {
+                            showSuccess();
+                        } else {
+                            alert('复制失败，请手动复制');
+                        }
+                    } catch (err) {
+                        console.error('Fallback copy failed: ', err);
+                        alert('复制失败，请手动复制');
+                    }
+
+                    document.body.removeChild(textArea);
+                },
+
+                async exportToHtml() {
+                    try {
+                        const clone = document.documentElement.cloneNode(true);
+                        
+                        // 0. 清理 Alpine 生成的 DOM 元素
+                        const templates = clone.querySelectorAll('template[x-for]');
+                        templates.forEach(template => {
+                            const parent = template.parentNode;
+                            if (parent && parent.tagName === 'TBODY') {
+                                const children = Array.from(parent.children);
+                                children.forEach(child => {
+                                    if (child === template) return;
+                                    if (child.hasAttribute('x-show')) return;
+                                    child.remove();
+                                });
+                            }
+                        });
+
+                        // 0.1 特殊处理 Popover 内容
+                        const popoverContent = clone.querySelector('.popover-content');
+                        if (popoverContent) {
+                            const children = Array.from(popoverContent.children);
+                            children.forEach(child => {
+                                if (child.tagName !== 'TEMPLATE') {
+                                    child.remove();
+                                }
+                            });
+                        }
+                        
+                        // 1. 内联 CSS
+                        const styleSheets = Array.from(document.styleSheets);
+                        let cssContent = '';
+                        
+                        const blobToBase64 = (blob) => {
+                            return new Promise((resolve, reject) => {
+                                const reader = new FileReader();
+                                reader.onloadend = () => resolve(reader.result);
+                                reader.onerror = reject;
+                                reader.readAsDataURL(blob);
+                            });
+                        };
+
+                        for (const sheet of styleSheets) {
+                            try {
+                                if (sheet.href) {
+                                    const response = await fetch(sheet.href);
+                                    let sheetText = await response.text();
+
+                                    const urlRegex = /url\(['"]?([^'"\)]+)['"]?\)/g;
+                                    let match;
+                                    const replacements = [];
+
+                                    while ((match = urlRegex.exec(sheetText)) !== null) {
+                                        const originalUrl = match[1];
+                                        if (originalUrl.startsWith('data:')) continue;
+                                        const cssUrl = new URL(sheet.href);
+                                        const resourceUrl = new URL(originalUrl, cssUrl).href;
+                                        replacements.push({
+                                            original: match[0],
+                                            url: resourceUrl
+                                        });
+                                    }
+
+                                    for (const item of replacements) {
+                                        try {
+                                            const res = await fetch(item.url);
+                                            const blob = await res.blob();
+                                            const base64 = await blobToBase64(blob);
+                                            sheetText = sheetText.split(item.original).join(`url('${base64}')`);
+                                        } catch (err) {
+                                            console.warn('Failed to inline resource:', item.url, err);
+                                        }
+                                    }
+
+                                    cssContent += sheetText;
+                                } else {
+                                    for (const rule of sheet.cssRules) {
+                                        cssContent += rule.cssText;
+                                    }
+                                }
+                            } catch (e) {
+                                console.warn('Failed to load stylesheet:', sheet.href, e);
+                            }
+                        }
+                        
+                        const links = clone.querySelectorAll('link[rel="stylesheet"]');
+                        links.forEach(link => link.remove());
+                        
+                        const style = document.createElement('style');
+                        style.textContent = cssContent;
+                        clone.querySelector('head').appendChild(style);
+
+                        // 2. 内联 AlpineJS 数据状态
+                        const currentData = {
+                            baseInfo: this.baseInfo,
+                            summary: this.summary,
+                            activeSessions: this.activeSessions,
+                            transactions: this.transactions,
+                            blockingSessions: this.blockingSessions,
+                            longOps: this.longOps,
+                            userSessionCounts: (this.userSessionCounts || []).filter(item => item && (item.username || item.count)),
+                            clientSessionCounts: (this.clientSessionCounts || []).filter(item => item && (item.client || item.count)),
+                            sqlInfo: this.sqlInfo,
+                            showPopover: false,
+                            currentSql: null,
+                            showBackToTop: false,
+                            sections: this.sections
+                        };
+
+                        const safeData = JSON.stringify(currentData)
+                            .replace(/</g, '\\u003c')
+                            .replace(/>/g, '\\u003e');
+
+                        const scriptContent = `
+                            const snapshotData = ${safeData};
+                            document.addEventListener('alpine:init', () => {
+                                Alpine.data('snapshotViewer', () => ({
+                                    ...snapshotData,
+                                    
+                                    toggleSection(section) {
+                                        this.sections[section] = !this.sections[section];
+                                    },
+                                    scrollToSection(sectionKey, elementId) {
+                                        if (!this.sections[sectionKey]) {
+                                            this.sections[sectionKey] = true;
+                                        }
+                                        this.$nextTick(() => {
+                                            const element = document.getElementById(elementId);
+                                            if (element) {
+                                                const offset = 20;
+                                                const elementPosition = element.getBoundingClientRect().top + window.scrollY;
+                                                const offsetPosition = elementPosition - offset;
+                                                window.scrollTo({ top: offsetPosition, behavior: "smooth" });
+                                            }
+                                        });
+                                    },
+                                    showSqlInfo(sqlId) {
+                                        if (!sqlId || sqlId === '-') return;
+                                        const sql = this.sqlInfo.find(s => s.sql_id === sqlId);
+                                        if (sql) {
+                                            this.currentSql = sql;
+                                        } else {
+                                            this.currentSql = {
+                                                sql_id: sqlId,
+                                                sql_text: '在当前快照的 SQL 信息列表中未找到详细文本',
+                                                last_active_time: '-',
+                                                executions: '-',
+                                                exec_sec: '-',
+                                                avg_exec_sec: '-'
+                                            };
+                                        }
+                                        this.showPopover = true;
+                                    },
+                                    async copyToClipboard(text) {
+                                        if (!text) return;
+                                        try {
+                                            await navigator.clipboard.writeText(text);
+                                            alert('已复制');
+                                        } catch (e) {
+                                            const textArea = document.createElement("textarea");
+                                            textArea.value = text;
+                                            document.body.appendChild(textArea);
+                                            textArea.select();
+                                            document.execCommand('copy');
+                                            document.body.removeChild(textArea);
+                                            alert('已复制');
+                                        }
+                                    },
+                                    exportToHtml() { alert('这是已导出的静态文件'); },
+                                    init() {
+                                        window.addEventListener('scroll', () => {
+                                            this.showBackToTop = window.scrollY > 300;
+                                        });
+                                    }
+                                }));
+                            });
+                        `;
+
+                        const oldScript = clone.querySelector('script:not([src])');
+                        if (oldScript) oldScript.remove();
+
+                        const newScript = document.createElement('script');
+                        newScript.textContent = scriptContent;
+                        clone.querySelector('head').appendChild(newScript);
+
+                        const scripts = clone.querySelectorAll('script[src]');
+                        for (const script of scripts) {
+                            try {
+                                if (script.src && script.src.includes(window.location.origin)) {
+                                    const response = await fetch(script.src);
+                                    const jsContent = await response.text();
+                                    const inlineScript = document.createElement('script');
+                                    inlineScript.textContent = jsContent;
+                                    script.remove();
+                                    clone.querySelector('body').appendChild(inlineScript);
+                                }
+                            } catch (e) {
+                                console.warn('Failed to inline script:', script.src);
+                            }
+                        }
+                        
+                        const htmlContent = "<!DOCTYPE html>\n" + clone.outerHTML;
+                        const blob = new Blob([htmlContent], { type: 'text/html' });
+                        const url = URL.createObjectURL(blob);
+                        
+                        const filename = `oracle_snapshot_${this.urlParams.instId || 'null'}_${this.urlParams.snapshotId || 'null'}.html`;
+
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+
+                    } catch (error) {
+                        console.error('Export failed:', error);
+                        alert('导出失败: ' + error.message);
+                    }
+                },
+            }));
+        });
+    </script>
+</body>
+
+</html>
